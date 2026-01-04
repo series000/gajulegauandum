@@ -1,0 +1,227 @@
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+--------------------------------------------------
+-- GLOBAL
+--------------------------------------------------
+_G.AutoFarm = false
+_G.AutoAttack = false
+_G.CurrentTarget = nil
+_G.TargetName = "Athlete"
+
+--------------------------------------------------
+-- ATTACK REMOTE
+--------------------------------------------------
+local AttackArgs = {
+    {
+        "NormalAttack",
+        "\t"
+    }
+}
+
+--------------------------------------------------
+-- TARGET -> QUEST MAP
+--------------------------------------------------
+local TargetQuestMap = {
+    ["Athlete"] = "QuestGiver (Lv.1-Lv.50)",
+    ["Rank 2 Investigator"] = "QuestGiver (Lv.50-Lv.150)",
+    ["Bulk Ghoul"] = "QuestGiver (Lv.150-Lv.250)",
+    ["Rank 1 Investigator"] = "QuestGiver (Lv.250-Lv.350)",
+    ["Serpent Ghoul"] = "QuestGiver (Lv.350-Lv.400)",
+    ["Rin Ghoul"] = "QuestGiver (Lv.400-Lv.450)",
+    ["First class Investigator"] = "QuestGiver (Lv.450-Lv.500)",
+    ["Kaneki"] = false,
+    ["Jason"] = false
+}
+
+--------------------------------------------------
+-- UI
+--------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "FarmUI"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+gui.Enabled = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.26, 0.42)
+frame.Position = UDim2.fromScale(0.02, 0.28)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,35)
+title.BackgroundTransparency = 1
+title.Text = "Target Select"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 20
+
+local mainBtn = Instance.new("TextButton", frame)
+mainBtn.Size = UDim2.new(1,-20,0,40)
+mainBtn.Position = UDim2.new(0,10,0,45)
+mainBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+mainBtn.TextColor3 = Color3.new(1,1,1)
+mainBtn.Font = Enum.Font.SourceSans
+mainBtn.TextSize = 16
+mainBtn.Text = "Target: ".._G.TargetName.." ▼"
+
+local listFrame = Instance.new("Frame", frame)
+listFrame.Position = UDim2.new(0,10,0,90)
+listFrame.Size = UDim2.new(1,-20,0,0)
+listFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+listFrame.Visible = false
+listFrame.ClipsDescendants = true
+
+local uiList = Instance.new("UIListLayout", listFrame)
+uiList.Padding = UDim.new(0,4)
+
+local Targets = {
+    "Athlete",
+    "Rank 2 Investigator",
+    "Bulk Ghoul",
+    "Rank 1 Investigator",
+    "Serpent Ghoul",
+    "Rin Ghoul",
+    "First class Investigator",
+    "Kaneki",
+    "Jason"
+}
+
+mainBtn.MouseButton1Click:Connect(function()
+    listFrame.Visible = not listFrame.Visible
+    listFrame.Size = listFrame.Visible
+        and UDim2.new(1,-20,0,#Targets*34)
+        or UDim2.new(1,-20,0,0)
+end)
+
+for _, name in ipairs(Targets) do
+    local b = Instance.new("TextButton", listFrame)
+    b.Size = UDim2.new(1,-10,0,30)
+    b.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.SourceSans
+    b.TextSize = 15
+    b.Text = name
+
+    b.MouseButton1Click:Connect(function()
+        _G.TargetName = name
+        mainBtn.Text = "Target: "..name.." ▼"
+        listFrame.Visible = false
+        listFrame.Size = UDim2.new(1,-20,0,0)
+    end)
+end
+
+--------------------------------------------------
+-- KEYBINDS
+--------------------------------------------------
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+
+    if input.KeyCode == Enum.KeyCode.G then
+        local state = not _G.AutoFarm
+        _G.AutoFarm = state
+        _G.AutoAttack = state
+        warn("AutoFarm & AutoAttack:", state)
+
+    elseif input.KeyCode == Enum.KeyCode.RightShift then
+        gui.Enabled = not gui.Enabled
+    end
+end)
+
+--------------------------------------------------
+-- AUTO ATTACK
+--------------------------------------------------
+task.spawn(function()
+    while task.wait(0.15) do
+        if _G.AutoAttack and _G.CurrentTarget then
+            RS.BridgeNet2.dataRemoteEvent:FireServer(unpack(AttackArgs))
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO FARM
+--------------------------------------------------
+local folder = workspace:FindFirstChild("AI/Player", true)
+
+task.spawn(function()
+    while task.wait() do
+        if not _G.AutoFarm or not folder then
+            _G.CurrentTarget = nil
+            continue
+        end
+
+        for _, v in ipairs(folder:GetDescendants()) do
+            if not _G.AutoFarm then break end
+
+            if v.Name == _G.TargetName
+            and v:FindFirstChild("Humanoid")
+            and v:FindFirstChild("HumanoidRootPart")
+            and v.Humanoid.Health > 0 then
+
+                _G.CurrentTarget = v
+
+                repeat
+                    task.wait()
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.CFrame = CFrame.lookAt(
+                            v.HumanoidRootPart.Position + Vector3.new(0,-6.5,0),
+                            v.HumanoidRootPart.Position
+                        )
+                    end
+                until v.Humanoid.Health <= 0 or not _G.AutoFarm
+
+                _G.CurrentTarget = nil
+            end
+        end
+    end
+end)
+
+--------------------------------------------------
+-- AUTO QUEST
+--------------------------------------------------
+local function HasQuest()
+    return player.PlayerGui:FindFirstChild("QuestGui") ~= nil
+end
+
+local function GetQuestObject()
+    local questName = TargetQuestMap[_G.TargetName]
+    if not questName then return nil end
+
+    local quests = RS.Modules.Client.TalkNpc.Quests
+    local giver = quests:FindFirstChild(questName)
+    if giver then
+        return giver:FindFirstChild("Quest")
+    end
+end
+
+local function GetQuestRemote()
+    for _, v in ipairs(RS.Network:GetChildren()) do
+        if v:IsA("RemoteEvent") and #v.Name > 30 then
+            return v
+        end
+    end
+end
+
+task.spawn(function()
+    while task.wait(5) do
+        if _G.AutoFarm and not HasQuest() then
+            local quest = GetQuestObject()
+            local remote = GetQuestRemote()
+            if quest and remote then
+                remote:FireServer("RequestQuest", quest)
+                warn("AutoQuest:", _G.TargetName)
+            end
+        end
+    end
+end)
